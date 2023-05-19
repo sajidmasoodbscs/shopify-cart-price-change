@@ -4,8 +4,16 @@ import { SQLiteSessionStorage } from "@shopify/shopify-app-session-storage-sqlit
 import { restResources } from "@shopify/shopify-api/rest/admin/2023-04";
 // import '@shopify/shopify-api/adapters/node';
 
+import sqlite3 from "sqlite3";
+import { join } from "path";
 
-const DB_PATH = `${process.cwd()}/database.sqlite`;
+import { PriceChangeDB } from "./price-change-db.js";
+
+const database = new sqlite3.Database(join(process.cwd(), "database.sqlite"));
+const sessionDb = new SQLiteSessionStorage(database);
+// Initialize SQLite DB
+PriceChangeDB.db = database;
+PriceChangeDB.init();
 
 
 
@@ -28,14 +36,14 @@ const shopify = shopifyApp({
     billing: undefined, // or replace with billingConfig above to enable example billing
   },
   auth: {
-    path: "/auth",
-    callbackPath: "/auth/callback",
+    path: "/api/auth",
+    callbackPath: "/api/auth/callback",
   },
   webhooks: {
     path: "/api/webhooks",
   },
   // This should be replaced with your preferred storage strategy
-  sessionStorage: new SQLiteSessionStorage(DB_PATH),
+  sessionStorage: sessionDb,
 });
 
 export default shopify;

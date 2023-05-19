@@ -8,16 +8,15 @@ import serveStatic from "serve-static";
 import bodyParser from "body-parser";
 
 import 'isomorphic-fetch';
-import Koa from 'koa'; 
-import session from 'koa-session'; 
-import shopifyAuth, {verifyRequest} from '@shopify/koa-shopify-auth';
 
 import shopify from "./shopify.js";
 import webhookHandlers from "./webhook-handlers.js";
 import { verify,shopifyInstance } from './verifyWebhook.js';
 
 import productCreator from "./product-creator.js";
-import {productGet} from "./product-price-changer.js"
+import {productGet} from "./product-price-changer.js";
+import {getSessionFromDB} from "./helper/price-change-helper.js";
+import {getSaveAccessToken} from "./verifyWebhook.js"
 
 
 
@@ -28,69 +27,18 @@ const STATIC_PATH =
     ? `${process.cwd()}/frontend/dist`
     : `${process.cwd()}/frontend/`;
 
-
 const app = express();
-
-
-// app.get('/redirect/endpoint', (req, res) => {
-
-//   console.log("/redirect/endpoint called --------------");
-
-//   const redirectURL = shopify.auth.buildEmbeddedAppUrl(req.query.host);
-
-//   res.redirect(redirectURL);
-// });
-
-// app.get(shopify.config.auth.callbackPath, async (req, res,next) => {
-
-//   console.log("api/auth/callback called --------------");
-
-//   // The library will automatically set the appropriate HTTP headers
-//   try {
-//     const callback = await shopify.auth.callback({
-//       rawRequest: req,
-//       rawResponse: res,
-//     });
-  
-//     console.log("Call back result is",callback);
-//     next();
-//   } catch (error) {
-//     console.log('error in start call back and error is =>',error);
-//   }
-//   // You can now use callback.session to make API requests
-// },
-// shopify.redirectToShopifyOrAppRoot()
-// );
-
-// app.get('/redirect/endpoint', async (req, res) => {
-
-//   console.log("/redirect/endpoint get embded url called --------------");
-
-//   const redirectURL = await shopify.auth.getEmbeddedAppUrl({
-//     rawRequest: req,
-//     rawResponse: res,
-//   });
-
-//   res.redirect(redirectURL);
-// });
-
-
-
+app.use(
+      bodyParser.json({
+        verify: (req, res, buf) => {
+        req.rawBody = buf; 
+        },
+      })
+    );
 
 app.use(express.json());
 app.use(cors());
-app.use(
-  bodyParser.json({
-    verify: (req, res, buf) => {
-    req.rawBody = buf; 
-    },
-  })
-);
 
-app.post( 
-  shopify.config.webhooks.path, 
-  shopify.processWebhooks({webhookHandlers:webhookHandlers}) 
-);
 
 
 // Set up Shopify authentication and webhook handling
@@ -98,10 +46,12 @@ app.get(shopify.config.auth.path, shopify.auth.begin());
 app.get(
   shopify.config.auth.callbackPath,
   shopify.auth.callback(),
-  (req,res)=>{
-    conosle.log("req data from the call back function => ",req.query.code)
-  },
   shopify.redirectToShopifyOrAppRoot()
+);
+
+app.post( 
+  shopify.config.webhooks.path, 
+  shopify.processWebhooks({webhookHandlers:webhookHandlers}) 
 );
 
 app.use("/api/*", shopify.validateAuthenticatedSession());
@@ -132,7 +82,7 @@ app.get("/api/products/count", async (_req, res) => {
   // console.log("App password is . :",process.env);
 
   console.log("Product count is :",countData);
-  console.log("Shopify Object is =>  ::::",shopify);
+  // console.log("Shopify Object is =>  ::::",shopify);
   console.log("BACKEND_PORT is :",process.env.BACKEND_PORT);
   console.log("HOST is :",process.env.HOST);
   console.log("PORT is :",process.env.PORT);
@@ -159,13 +109,27 @@ app.get("/api/products/create", async (_req, res) => {
 
 
 app.post("/api/product/pricechange", async (req, res) => {
+
   let status = 200;
   let error = null;
 
-console.log("Reqesut from front end", req.body)
+console.log("Reqesut from front end", req.body);
+console.log("Response from front end", res.locals)
+
   try {
-  const getResponse=  await productGet(res.locals.shopify.session,req.body.name);
-  console.log("getResponse :=>",JSON.stringify(getResponse.body));
+    
+    const shopName= res.locals.shopify.session.shop
+  
+    
+    const name="sajid";
+    const age=27;
+  const xyz=await getSaveAccessToken(name);
+  console.log("Datase base execution  response:",xyz);
+
+  // const dbRes=await getSessionFromDB(shopName);
+  // console.log("Datase base execution response:",dbRes);
+  // const getResponse=  await productGet(res.locals.shopify.session,req.body.name);
+  // console.log("getResponse :=>",JSON.stringify(getResponse.body));
   } catch (e) {
     console.log(`Failed to process products/create: ${e.message}`);
     status = 500;
